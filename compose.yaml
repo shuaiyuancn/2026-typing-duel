@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    container_name: myapp_dev
+    ports:
+      - "5001:5001"
+    volumes:
+      - .:/app
+      - /app/.venv
+    environment:
+      - UV_PROJECT_ENVIRONMENT=/app/.venv
+      # DB Connection: Uses .env value if set, otherwise defaults to local DB container
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
+    depends_on:
+      - db
+    command: sh -c "uv sync && uv run python main.py"
+
+  db:
+    image: postgres:latest
+    container_name: myapp_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+
+volumes:
+  postgres_data:

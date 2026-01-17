@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache
+
+# Virtual environments
+.venv
+
+.vercel
+
+.sesskey
+todos.db
+todos.db-shm
+todos.db-wal
+
+.env.development.local
+.env
