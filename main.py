@@ -246,4 +246,5 @@ async def ws_game(ws: WebSocket):
 app.add_websocket_route("/ws/game/{code}/{pid}", ws_game)
 
 if __name__ == "__main__":
-    serve(host="0.0.0.0", port=5001)
+    port = int(os.getenv("PORT", 5001))
+    serve(host="0.0.0.0", port=port)
