@@ -29,6 +29,22 @@ class GameManager:
         self.easy_words = self._load_words("data/easy_words.txt")
         self.hard_words = self._load_words("data/hard_words.txt")
         self.default_words = ["HELLO", "WORLD", "TYPING", "DUEL", "FAST", "HTML", "CODE", "PYTHON", "REDIS", "THREEJS"]
+        
+        # Extra words for Hard Bonus (8-10 chars)
+        self.extra_hard_words = [
+            "COMPUTER", "KEYBOARD", "DEVELOPER", "ENGINEER", "DATABASE", 
+            "FRONTEND", "BACKEND", "PLATFORM", "VARIABLE", "FUNCTION", 
+            "ITERATION", "PROTOCOL", "SECURITY", "SOFTWARE", "HARDWARE", 
+            "INTERNET", "WIRELESS", "GRAPHICS", "OVERLOAD", "TERMINAL"
+        ]
+        
+        # Create Bonus Pools
+        all_words = set(self.easy_words + self.hard_words + self.default_words + self.extra_hard_words)
+        self.bonus_easy = [w for w in all_words if 5 <= len(w) <= 8]
+        self.bonus_hard = [w for w in all_words if 8 <= len(w) <= 10]
+        
+        if not self.bonus_easy: self.bonus_easy = ["BONUS"]
+        if not self.bonus_hard: self.bonus_hard = ["SUPERBONUS"]
 
     def _load_words(self, path):
         if os.path.exists(path):
@@ -145,6 +161,8 @@ class GameManager:
                 difficulty = game.get("difficulty", "easy")
                 if difficulty == "hard":
                     words_pool = self.hard_words or self.default_words
+                elif difficulty == "insane":
+                    words_pool = self.bonus_hard # Base pool is 8-10 chars
                 else:
                     words_pool = self.easy_words or self.default_words
 
@@ -168,9 +186,31 @@ class GameManager:
                         sx = -6 if is_left else 6
                         svx = 0.05 if is_left else -0.05
                         sy = random.uniform(2, 8)
-                        await self._spawn_word(code, pid, "BONUS", x=sx, y=sy, vx=svx, vy=0.0, duration=5.0, is_special=True)
+                        
+                        # Select Bonus Word based on difficulty
+                        if difficulty == "hard" or difficulty == "insane":
+                            bonus_text = random.choice(self.bonus_hard)
+                        else:
+                            bonus_text = random.choice(self.bonus_easy)
+                        
+                        if difficulty == "insane":
+                             symbol = random.choice("!@#$%^&*?")
+                             if random.choice([True, False]):
+                                 bonus_text = symbol + bonus_text
+                             else:
+                                 bonus_text = bonus_text + symbol
+                            
+                        await self._spawn_word(code, pid, bonus_text, x=sx, y=sy, vx=svx, vy=0.0, duration=5.0, is_special=True)
                     else:
-                        await self._spawn_word(code, pid, random.choice(words_pool), duration=duration)
+                        word_text = random.choice(words_pool)
+                        if difficulty == "insane":
+                             symbol = random.choice("!@#$%^&*?")
+                             if random.choice([True, False]):
+                                 word_text = symbol + word_text
+                             else:
+                                 word_text = word_text + symbol
+                        
+                        await self._spawn_word(code, pid, word_text, duration=duration)
                     
                     # 2. Check Expiration
                     active_words = await self.redis.hgetall(f"game:{code}:{pid}:words")
@@ -191,10 +231,15 @@ class GameManager:
             print(f"Game Loop Error: {e}")
 
     async def submit_word(self, code: str, pid: str, word_text: str):
+        print(f"DEBUG: submit_word called for {pid} with '{word_text}'")
         active_words = await self.redis.hgetall(f"game:{code}:{pid}:words")
+        print(f"DEBUG: active_words keys: {list(active_words.keys())}")
+        
         for wid, w_json in active_words.items():
             w = json.loads(w_json)
+            # print(f"DEBUG: checking against '{w['text']}'")
             if w["text"] == word_text:
+                print(f"DEBUG: MATCH FOUND for '{word_text}' (id: {wid})")
                 await self.redis.hdel(f"game:{code}:{pid}:words", wid)
                 
                 players_json = await self.redis.hget(f"game:{code}", "players")

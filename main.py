@@ -40,6 +40,7 @@ def get():
                                 Select(
                                     Option("Easy", value="easy"),
                                     Option("Hard", value="hard"),
+                                    Option("Insane", value="insane"),
                                     name="difficulty",
                                     cls="browser-default"
                                 ),
@@ -236,12 +237,25 @@ async def ws_game(ws: WebSocket):
                     word = msg.get("word")
                     if word:
                         await gm.submit_word(code, pid, word)
+                
+                elif msg.get("type") == "debug_log":
+                    print(f"CLIENT DEBUG ({pid}): {msg.get('msg')}")
+
             except json.JSONDecodeError:
-                pass
+                print(f"JSON Decode Error for {pid}. Data: {data[:100]}...")
     except WebSocketDisconnect:
         print(f"Player {pid} disconnected")
+    except Exception as e:
+        print(f"WebSocket error for {pid}: {e}")
+    finally:
+        print(f"Cleaning up connection for {pid}")
         reader_task.cancel()
+        try:
+            await reader_task
+        except asyncio.CancelledError:
+            pass
         await pubsub.unsubscribe()
+        await pubsub.close()
 
 app.add_websocket_route("/ws/game/{code}/{pid}", ws_game)
 

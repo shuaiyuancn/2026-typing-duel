@@ -12,6 +12,7 @@ let particles = [];
 let floatingTexts = [];
 let currentInput = "";
 let gameRunning = false;
+let scene; // Global scene variable
 
 // WebSocket Setup
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -119,8 +120,42 @@ ws.onmessage = (event) => {
                 bgAudio.currentTime = 0;
             }
             const result = msg.loser === playerId ? "YOU LOSE" : "YOU WIN";
-            alert(`GAME OVER: ${result}`);
-            location.reload();
+            
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.top = '0';
+            div.style.left = '0';
+            div.style.width = '100vw';
+            div.style.height = '100vh';
+            div.style.backgroundColor = 'rgba(0,0,0,0.85)';
+            div.style.display = 'flex';
+            div.style.flexDirection = 'column';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'center';
+            div.style.zIndex = '2000';
+            
+            const h1 = document.createElement('h1');
+            h1.innerText = result;
+            h1.style.color = msg.loser === playerId ? '#ff3333' : '#33ff33';
+            h1.style.fontFamily = 'monospace';
+            h1.style.fontSize = '80px';
+            h1.style.textShadow = '0 0 20px currentColor';
+            
+            const btn = document.createElement('button');
+            btn.innerText = "Back to Home";
+            btn.style.marginTop = '40px';
+            btn.style.padding = '15px 30px';
+            btn.style.fontSize = '24px';
+            btn.style.fontFamily = 'monospace';
+            btn.style.cursor = 'pointer';
+            btn.style.backgroundColor = '#333';
+            btn.style.color = 'white';
+            btn.style.border = '2px solid white';
+            btn.onclick = () => window.location.href = '/';
+            
+            div.appendChild(h1);
+            div.appendChild(btn);
+            document.body.appendChild(div);
         }
 
     } catch (e) {
@@ -179,7 +214,7 @@ function initGame() {
 
     createHUD();
 
-    const scene = new THREE.Scene();
+    scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111); 
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -262,8 +297,9 @@ function initGame() {
     });
 
     window.spawnWord = (wordData) => {
+        const wordText = wordData.text ? wordData.text.trim() : "";
         const color = wordData.is_special ? "#ffd700" : "rgba(0,255,0,1)";
-        const sprite = createTextSprite(wordData.text, color);
+        const sprite = createTextSprite(wordText, color);
         sprite.position.set(wordData.x, wordData.y || 10, 0);
         wordGroup.add(sprite);
         
@@ -274,7 +310,7 @@ function initGame() {
         
         activeWords.set(wordData.id, {
             sprite: sprite,
-            text: wordData.text,
+            text: wordText,
             id: wordData.id,
             vx: wordData.vx || 0,
             vy: vy,
@@ -485,93 +521,60 @@ function handleInput(e) {
 
     if (!gameRunning) return;
     
+    // 1. Submit on Enter
+    if (e.key === "Enter") {
+        if (currentInput.length > 0) {
+            console.log("Submitting (Enter):", currentInput);
+            ws.send(JSON.stringify({type: "submit_word", word: currentInput}));
+            
+            currentInput = "";
+            inputDisplay.innerText = "INPUT: >_";
+            
+            // Clear highlights immediately
+            for (const [id, data] of activeWords) {
+                 const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", 0);
+                 newSprite.position.copy(data.sprite.position);
+                 wordGroup.remove(data.sprite);
+                 wordGroup.add(newSprite);
+                 data.sprite = newSprite;
+            }
+        }
+        return;
+    }
+    
+    // 2. Typing Logic
     if (e.key === "Backspace") {
         currentInput = currentInput.slice(0, -1);
-    } else if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+    } else if (e.key.length === 1 && /[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':",./<>?]/.test(e.key)) {
         currentInput += e.key.toUpperCase();
     }
     
-        // Update UI
-    
-        inputDisplay.innerText = `INPUT: > ${currentInput}`;
-    
-        
-    
-        // Check Matches & Update Highlights
-    
-        let exactMatchId = null;
-    
-        
-    
-        activeWords.forEach((data, id) => {
-    
+    inputDisplay.innerText = `INPUT: > ${currentInput}`;
+
+    // 3. Visual Highlighting Only (No Auto-Submit)
+    for (const [id, data] of activeWords) {
+        // Highlight Partial
+        if (data.text.startsWith(currentInput) && currentInput.length > 0) {
+            const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", currentInput.length);
+            newSprite.position.copy(data.sprite.position);
+            wordGroup.remove(data.sprite);
+            wordGroup.add(newSprite);
+            data.sprite = newSprite;
+            
+            // Visual Cue for Full Match (Yellow)
             if (data.text === currentInput) {
-    
-                exactMatchId = id;
-    
+                data.sprite.material.color.set(0xffff00);
             }
-    
-            
-    
-            // Highlight Partial
-    
-            if (data.text.startsWith(currentInput) && currentInput.length > 0) {
-    
-                // Update Sprite if not already highlighted to this length
-    
-                // Need to store currentHighlightLen to avoid redraw?
-    
-                // For now just redraw, canvas is cheap enough for low word count
-    
-                const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", currentInput.length);
-    
-                newSprite.position.copy(data.sprite.position);
-    
-                wordGroup.remove(data.sprite);
-    
-                wordGroup.add(newSprite);
-    
-                data.sprite = newSprite;
-    
-            } else {
-    
-                // Reset if it was highlighted but now isn't (backspace or divergence)
-    
-                // Ideally we check if it needs reset. createTextSprite default is len=0
-    
-                 const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", 0);
-    
-                 newSprite.position.copy(data.sprite.position);
-    
-                 wordGroup.remove(data.sprite);
-    
-                 wordGroup.add(newSprite);
-    
-                 data.sprite = newSprite;
-    
-            }
-    
-        });
-    
-        
-    
-        if (exactMatchId) {
-    
-            ws.send(JSON.stringify({type: "submit_word", word: currentInput}));
-    
-            currentInput = "";
-    
-            inputDisplay.innerText = "INPUT: >_"; 
-    
-            
-    
-            const data = activeWords.get(exactMatchId);
-    
-            data.sprite.material.color.set(0xffff00); 
-    
+        } else {
+            // Reset if it was highlighted but now isn't
+             const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", 0);
+             newSprite.position.copy(data.sprite.position);
+             wordGroup.remove(data.sprite);
+             wordGroup.add(newSprite);
+             data.sprite = newSprite;
         }
-    
     }
+}
 
 // Effects
 function triggerShake(duration) {
