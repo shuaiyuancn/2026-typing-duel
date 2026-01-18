@@ -249,9 +249,13 @@ class GameManager:
                 "duration": 3000
             }))
         elif power_type == "barrage":
-            words = ["BARRAGE", "ATTACK", "SWARM", "DANGER", "FAST"]
+            difficulty = await self.redis.hget(f"game:{code}", "difficulty")
+            pool = self.hard_words if difficulty == "hard" else self.easy_words
+            # Fallback
+            if not pool: pool = self.default_words
+            
             for _ in range(5):
-                await self._spawn_word(code, opponent_pid, random.choice(words))
+                await self._spawn_word(code, opponent_pid, random.choice(pool), duration=5.0) # Fast barrage
         elif power_type == "blindness":
              await self.redis.publish(f"game:{code}:events", json.dumps({
                 "type": "effect_blind",
