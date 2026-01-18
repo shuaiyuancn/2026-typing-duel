@@ -68,6 +68,7 @@ ws.onmessage = (event) => {
             removeWord(msg.word_id, true); // True for explosion
             if (msg.player_id === playerId) {
                 updatePower(msg.new_power);
+                updateCombo(msg.combo);
                 if (msg.triggered_power) {
                     showNotification(`POWER ACTIVATED: ${msg.triggered_power.toUpperCase()}!`);
                 }
@@ -83,6 +84,7 @@ ws.onmessage = (event) => {
         if (msg.type === 'health_update') {
             if (msg.player_id === playerId) {
                 updateHealth(msg.new_health);
+                if (msg.combo !== undefined) updateCombo(msg.combo);
             } else {
                 updateHealth(msg.new_health, true);
             }
@@ -408,32 +410,12 @@ function createHUD() {
     powerDisplay.style.marginTop = '10px';
     hud.appendChild(powerDisplay);
     
-    // Opponent Stats
-    const opponentHud = document.createElement('div');
-    opponentHud.style.position = 'absolute';
-    opponentHud.style.top = '10px';
-    opponentHud.style.right = '10px';
-    opponentHud.style.color = 'white';
-    opponentHud.style.fontFamily = 'monospace';
-    opponentHud.style.fontSize = '24px';
-    opponentHud.style.textAlign = 'right';
-    opponentHud.style.zIndex = '100';
-    opponentHud.id = 'opponent-hud';
-    
-    const oppHealth = document.createElement('div');
-    oppHealth.id = 'opp-health';
-    oppHealth.innerText = "OPPONENT: 100%";
-    oppHealth.style.color = '#ff3333';
-    opponentHud.appendChild(oppHealth);
-    
-    const oppPower = document.createElement('div');
-    oppPower.id = 'opp-power';
-    oppPower.innerText = "POWER: 0%";
-    oppPower.style.color = '#33ccff';
-    oppPower.style.marginTop = '10px';
-    opponentHud.appendChild(oppPower);
-    
-    document.body.appendChild(opponentHud);
+    comboDisplay = document.createElement('div');
+    comboDisplay.innerText = "COMBO: 0";
+    comboDisplay.style.color = '#ffff00';
+    comboDisplay.style.marginTop = '10px';
+    comboDisplay.style.fontWeight = 'bold';
+    hud.appendChild(comboDisplay);
     
     inputDisplay = document.createElement('div');
     inputDisplay.innerText = "INPUT: >_";
@@ -460,6 +442,10 @@ function updatePower(val, isOpponent=false) {
     } else {
         if (powerDisplay) powerDisplay.innerText = `POWER: ${val}%`;
     }
+}
+
+function updateCombo(val) {
+    if (comboDisplay) comboDisplay.innerText = `COMBO: ${val}`;
 }
 
 function showNotification(msg) {

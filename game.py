@@ -15,6 +15,7 @@ class Player:
     health: int = 100
     power: int = 0
     words_cleared: int = 0
+    combo: int = 0
     is_ready: bool = False
 
 @dataclass
@@ -176,7 +177,10 @@ class GameManager:
                 players = json.loads(players_json)
                 
                 if pid in players:
-                    players[pid]["power"] += 10 # 25 for testing
+                    players[pid]["combo"] += 1
+                    multiplier = 1 + (players[pid]["combo"] // 5) * 0.5
+                    
+                    players[pid]["power"] += int(10 * multiplier) 
                     players[pid]["words_cleared"] += 1
                     
                     triggered_power = None
@@ -195,7 +199,8 @@ class GameManager:
                         "player_id": pid,
                         "word_id": wid,
                         "new_power": players[pid]["power"],
-                        "triggered_power": triggered_power
+                        "triggered_power": triggered_power,
+                        "combo": players[pid]["combo"]
                     }))
                     return True
         return False
@@ -237,6 +242,7 @@ class GameManager:
         players = json.loads(players_json)
         
         if pid in players:
+            players[pid]["combo"] = 0
             players[pid]["health"] -= amount
             if players[pid]["health"] <= 0:
                 players[pid]["health"] = 0
@@ -250,7 +256,8 @@ class GameManager:
             await self.redis.publish(f"game:{code}:events", json.dumps({
                 "type": "health_update",
                 "player_id": pid,
-                "new_health": players[pid]["health"]
+                "new_health": players[pid]["health"],
+                "combo": players[pid]["combo"]
             }))
 
     def _generate_id(self):
