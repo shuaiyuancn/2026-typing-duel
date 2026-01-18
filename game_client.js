@@ -287,41 +287,53 @@ function initGame() {
     document.addEventListener('keydown', handleInput);
 }
 
-function createTextSprite(message, color="rgba(0,255,0,1)") {
+function createTextSprite(message, color="rgba(0,255,0,1)", highlightLen=0) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 512; // Increase resolution for better distortion
     canvas.height = 128;
     
     const fonts = ['Arial', 'Verdana', 'Courier New', 'Georgia', 'Impact', 'Trebuchet MS', 'Comic Sans MS'];
-    const fontName = fonts[Math.floor(Math.random() * fonts.length)];
+    // Deterministic font based on message length to avoid jitter on redraw
+    const fontName = fonts[message.length % fonts.length]; 
     context.font = `Bold 48px "${fontName}"`;
     
     // 1. Distortion: Random Skew
-    // setTransform(hScale, vSkew, hSkew, vScale, dx, dy)
-    const skewX = (Math.random() - 0.5) * 0.5; // +/- 0.25 skew
-    const skewY = (Math.random() - 0.5) * 0.1; 
+    // Use fixed seed based on message to avoid jitter
+    const seed = message.length; 
+    const skewX = (Math.sin(seed) * 0.5) * 0.5; 
+    const skewY = (Math.cos(seed) * 0.5) * 0.1; 
     context.setTransform(1, skewY, skewX, 1, 0, 0);
 
     // 2. Chromatic Aberration (Glitch)
-    // Red channel offset
     context.fillStyle = "rgba(255,0,0,0.7)";
-    context.fillText(message, 10 + (Math.random()*4-2), 64);
+    context.fillText(message, 10 + (Math.sin(seed)*4-2), 64);
     
-    // Blue channel offset
     context.fillStyle = "rgba(0,0,255,0.7)";
-    context.fillText(message, 10 + (Math.random()*4-2), 64);
+    context.fillText(message, 10 + (Math.cos(seed)*4-2), 64);
     
-    // Main Green Text
-    context.fillStyle = color;
-    context.fillText(message, 10, 64);
+    // Main Text with Highlight
+    if (highlightLen > 0) {
+        const matched = message.substring(0, highlightLen);
+        const rest = message.substring(highlightLen);
+        
+        context.fillStyle = "#ffff00"; // Yellow Highlight
+        context.fillText(matched, 10, 64);
+        
+        const matchedWidth = context.measureText(matched).width;
+        context.fillStyle = color;
+        context.fillText(rest, 10 + matchedWidth, 64);
+    } else {
+        context.fillStyle = color;
+        context.fillText(message, 10, 64);
+    }
     
     const texture = new THREE.Texture(canvas);
     texture.needsUpdate = true;
     
     const material = new THREE.SpriteMaterial({ map: texture });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(4, 1, 1); // Adjust scale for wider canvas
+    sprite.scale.set(4, 1, 1); 
     return sprite;
 }
 
@@ -481,26 +493,87 @@ function handleInput(e) {
         currentInput += e.key.toUpperCase();
     }
     
-    // Update UI
-    inputDisplay.innerText = `INPUT: > ${currentInput}`;
+        // Update UI
     
-    // Check Match
-    let matchedId = null;
-    activeWords.forEach((data, id) => {
-        if (data.text === currentInput) {
-            matchedId = id;
-        }
-    });
+        inputDisplay.innerText = `INPUT: > ${currentInput}`;
     
-    if (matchedId) {
-        ws.send(JSON.stringify({type: "submit_word", word: currentInput}));
-        currentInput = "";
-        inputDisplay.innerText = "INPUT: >_"; 
         
-        const data = activeWords.get(matchedId);
-        data.sprite.material.color.set(0xffff00); 
+    
+        // Check Matches & Update Highlights
+    
+        let exactMatchId = null;
+    
+        
+    
+        activeWords.forEach((data, id) => {
+    
+            if (data.text === currentInput) {
+    
+                exactMatchId = id;
+    
+            }
+    
+            
+    
+            // Highlight Partial
+    
+            if (data.text.startsWith(currentInput) && currentInput.length > 0) {
+    
+                // Update Sprite if not already highlighted to this length
+    
+                // Need to store currentHighlightLen to avoid redraw?
+    
+                // For now just redraw, canvas is cheap enough for low word count
+    
+                const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", currentInput.length);
+    
+                newSprite.position.copy(data.sprite.position);
+    
+                wordGroup.remove(data.sprite);
+    
+                wordGroup.add(newSprite);
+    
+                data.sprite = newSprite;
+    
+            } else {
+    
+                // Reset if it was highlighted but now isn't (backspace or divergence)
+    
+                // Ideally we check if it needs reset. createTextSprite default is len=0
+    
+                 const newSprite = createTextSprite(data.text, "rgba(0,255,0,1)", 0);
+    
+                 newSprite.position.copy(data.sprite.position);
+    
+                 wordGroup.remove(data.sprite);
+    
+                 wordGroup.add(newSprite);
+    
+                 data.sprite = newSprite;
+    
+            }
+    
+        });
+    
+        
+    
+        if (exactMatchId) {
+    
+            ws.send(JSON.stringify({type: "submit_word", word: currentInput}));
+    
+            currentInput = "";
+    
+            inputDisplay.innerText = "INPUT: >_"; 
+    
+            
+    
+            const data = activeWords.get(exactMatchId);
+    
+            data.sprite.material.color.set(0xffff00); 
+    
+        }
+    
     }
-}
 
 // Effects
 function triggerShake(duration) {
