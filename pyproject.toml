@@ -1,15 +1,11 @@
 [project]
-name = "myapp"
+name = "typing_duel"
 version = "0.1.0"
-description = "Add your description here"
+description = "An online typing duel game with fun interactions."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "python-fasthtml>=0.12.39",
-    "libsql>=0.1.11",
-    "libsql-client>=0.3.1",
-    "psycopg2-binary>=2.9.11",
-    "fastsql>=2.1.1",
     "redis>=5.0.0",
 ]
 

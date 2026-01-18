@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    container_name: myapp_dev
+    container_name: typing_duel_web
     ports:
       - "0.0.0.0:5001:5001"
     volumes:
