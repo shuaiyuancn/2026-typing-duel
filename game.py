@@ -102,10 +102,14 @@ class GameManager:
         return data
 
     async def set_game_status(self, code: str, status: str):
-        await self.redis.hset(f"game:{code}", "status", status)
+        mapping = {"status": status}
+        if status == "playing":
+            mapping["start_time"] = time.time()
+            
+        await self.redis.hset(f"game:{code}", mapping=mapping)
         await self.redis.publish(f"game:{code}:events", json.dumps({"type": "status_change", "status": status}))
 
-    async def _spawn_word(self, code, pid, word_text, x=None):
+    async def _spawn_word(self, code, pid, word_text, x=None, duration=10.0):
         if x is None:
             x = random.uniform(-4, 4)
         word_id = self._generate_id()
@@ -114,7 +118,7 @@ class GameManager:
             "id": word_id,
             "x": x,
             "spawn_time": time.time(),
-            "duration": 10.0
+            "duration": duration
         }
         await self.redis.hset(f"game:{code}:{pid}:words", word_id, json.dumps(word_data))
         await self.redis.publish(f"game:{code}:events", json.dumps({
@@ -126,27 +130,36 @@ class GameManager:
     async def start_game_loop(self, code: str):
         try:
             while True:
-                status = await self.redis.hget(f"game:{code}", "status")
-                if status != "playing":
+                # Fetch full game state for start_time
+                game = await self.redis.hgetall(f"game:{code}")
+                if game.get("status") != "playing":
                     break
                 
-                difficulty = await self.redis.hget(f"game:{code}", "difficulty")
+                status = game["status"]
+                
+                # Determine word list based on difficulty
+                difficulty = game.get("difficulty", "easy")
                 if difficulty == "hard":
                     words_pool = self.hard_words or self.default_words
                 else:
                     words_pool = self.easy_words or self.default_words
 
-                players_json = await self.redis.hget(f"game:{code}", "players")
+                players_json = game.get("players")
                 players = json.loads(players_json) if players_json else {}
                 
                 now = time.time()
+                start_time = float(game.get("start_time", now))
+                elapsed = now - start_time
                 
                 for pid, p_data in players.items():
                     if p_data["health"] <= 0:
                         continue 
                     
                     # 1. Spawn Word
-                    await self._spawn_word(code, pid, random.choice(words_pool))
+                    # Speed Scaling: 10s -> 3s over 3 mins (180s)
+                    duration = max(3.0, 10.0 - (elapsed / 18.0 * 7.0)) 
+                    
+                    await self._spawn_word(code, pid, random.choice(words_pool), duration=duration)
                     
                     # 2. Check Expiration
                     active_words = await self.redis.hgetall(f"game:{code}:{pid}:words")

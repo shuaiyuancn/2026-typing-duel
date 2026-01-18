@@ -219,13 +219,9 @@ function initGame() {
     function animate() {
         requestAnimationFrame(animate);
         
-        // Animate Background
-        starMesh.rotation.y += 0.0002;
-        gridHelper.position.z = (gridHelper.position.z + 0.05) % 1;
-        
         // Move words
         activeWords.forEach((data, id) => {
-            data.sprite.position.y -= 0.03; 
+            data.sprite.position.y -= data.speed || 0.03; 
         });
 
         // Move Particles
@@ -263,10 +259,15 @@ function initGame() {
         sprite.position.set(wordData.x, 10, 0);
         wordGroup.add(sprite);
         
+        const duration = wordData.duration || 10.0;
+        // Distance 15 units (10 to -5)
+        const speed = 15.0 / (duration * 60.0);
+        
         activeWords.set(wordData.id, {
             sprite: sprite,
             text: wordData.text,
-            id: wordData.id
+            id: wordData.id,
+            speed: speed
         });
     };
 
