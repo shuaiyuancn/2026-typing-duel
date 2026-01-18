@@ -75,8 +75,8 @@ class GameManager:
         
         return code, host_id
 
-    async def create_practice_game(self, host_name: str) -> tuple[str, str]:
-        code, host_id = await self.create_game(host_name, "easy", ["clear_screen"])
+    async def create_practice_game(self, host_name: str, difficulty: str = "easy") -> tuple[str, str]:
+        code, host_id = await self.create_game(host_name, difficulty, ["clear_screen"])
         await self.redis.hset(f"game:{code}", "mode", "practice")
         return code, host_id
 

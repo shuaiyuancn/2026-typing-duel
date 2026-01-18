@@ -114,6 +114,17 @@ def get():
                                 Input(name="name", placeholder="Enter your name", required=True),
                                 cls="input-field"
                             ),
+                            Div(
+                                Label("Difficulty", style="font-size: 1rem; color: #9e9e9e; display: block; margin-bottom: 5px;"),
+                                Select(
+                                    Option("Easy", value="easy"),
+                                    Option("Hard", value="hard"),
+                                    Option("Insane", value="insane"),
+                                    name="difficulty",
+                                    cls="browser-default"
+                                ),
+                                style="margin-bottom: 25px;"
+                            ),
                             Button("Start Solo", type="submit", cls="btn waves-effect waves-light purple lighten-1"),
                             action="/practice", method="post"
                         ),
@@ -142,8 +153,8 @@ async def post(name: str, difficulty: str, powers: list[str] = None):
     return RedirectResponse(f"/lobby/{code}?pid={pid}", status_code=303)
 
 @rt('/practice')
-async def post(name: str):
-    code, pid = await gm.create_practice_game(name)
+async def post(name: str, difficulty: str = "easy"):
+    code, pid = await gm.create_practice_game(name, difficulty)
     return RedirectResponse(f"/lobby/{code}?pid={pid}", status_code=303)
 
 
