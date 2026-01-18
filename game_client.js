@@ -9,6 +9,7 @@ const startBtn = document.getElementById('start-btn');
 // State
 let activeWords = new Map(); // id -> {sprite, text, x, startY, speed}
 let particles = [];
+let floatingTexts = [];
 let currentInput = "";
 let gameRunning = false;
 
@@ -58,6 +59,12 @@ ws.onmessage = (event) => {
         }
         
         if (msg.type === 'word_cleared') {
+            // Capture pos before remove
+            const w = activeWords.get(msg.word_id);
+            if (w && msg.player_id === playerId) {
+                spawnFloatingText("+10", w.sprite.position.x, w.sprite.position.y, 0xffff00, scene);
+            }
+            
             removeWord(msg.word_id, true); // True for explosion
             if (msg.player_id === playerId) {
                 updatePower(msg.new_power);
@@ -228,6 +235,16 @@ function initGame() {
                 particles.splice(i, 1);
             }
         }
+        
+        // Update Floating Texts
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const t = floatingTexts[i];
+            t.update();
+            if (t.isDead()) {
+                scene.remove(t.mesh);
+                floatingTexts.splice(i, 1);
+            }
+        }
 
         renderer.render(scene, camera);
     }
@@ -306,6 +323,24 @@ function createTextSprite(message, color="rgba(0,255,0,1)") {
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(4, 1, 1); // Adjust scale for wider canvas
     return sprite;
+}
+
+function spawnFloatingText(text, x, y, color, scene) {
+    const sprite = createTextSprite(text, "rgba(255, 255, 0, 1)");
+    sprite.scale.set(2, 1, 1);
+    sprite.position.set(x, y, 0);
+    scene.add(sprite);
+    
+    floatingTexts.push({
+        mesh: sprite,
+        life: 1.0,
+        update: function() {
+            this.mesh.position.y += 0.05;
+            this.life -= 0.02;
+            this.mesh.material.opacity = this.life;
+        },
+        isDead: function() { return this.life <= 0; }
+    });
 }
 
 function spawnExplosion(x, y, color, scene) {
