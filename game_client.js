@@ -140,7 +140,7 @@ function startMusic() {
     if (!bgAudio) {
         bgAudio = new Audio('/bg.m4a');
         bgAudio.loop = true;
-        bgAudio.volume = 0.5;
+        bgAudio.volume = 1.0;
     }
     
     bgAudio.play().then(() => {
@@ -187,8 +187,21 @@ function initGame() {
     directionalLight.position.set(0, 10, 5);
     scene.add(directionalLight);
 
-    const gridHelper = new THREE.GridHelper(20, 20, 0x00ffff, 0x444444);
+    const gridHelper = new THREE.GridHelper(40, 40, 0x00ffff, 0x222222);
+    gridHelper.position.y = -5;
     scene.add(gridHelper);
+    
+    // Starfield
+    const starGeo = new THREE.BufferGeometry();
+    const starCnt = 1000;
+    const starArr = new Float32Array(starCnt * 3);
+    for(let i=0; i<starCnt*3; i++) {
+        starArr[i] = (Math.random() - 0.5) * 200;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starArr, 3));
+    const starMat = new THREE.PointsMaterial({size: 0.2, color: 0xffffff});
+    const starMesh = new THREE.Points(starGeo, starMat);
+    scene.add(starMesh);
 
     const wordGroup = new THREE.Group();
     scene.add(wordGroup);
@@ -196,6 +209,10 @@ function initGame() {
     // Render Loop
     function animate() {
         requestAnimationFrame(animate);
+        
+        // Animate Background
+        starMesh.rotation.y += 0.0002;
+        gridHelper.position.z = (gridHelper.position.z + 0.05) % 1;
         
         // Move words
         activeWords.forEach((data, id) => {
