@@ -219,9 +219,16 @@ function initGame() {
     function animate() {
         requestAnimationFrame(animate);
         
+        // Animate Background
+        starMesh.rotation.y += 0.0002;
+        gridHelper.position.z = (gridHelper.position.z + 0.05) % 1;
+        
         // Move words
         activeWords.forEach((data, id) => {
-            data.sprite.position.y -= data.speed || 0.03; 
+            data.sprite.position.x += data.vx;
+            // vy is falling speed (positive value), so subtract
+            // Special words might have vy=0
+            if (data.vy) data.sprite.position.y -= data.vy; 
         });
 
         // Move Particles
@@ -255,19 +262,23 @@ function initGame() {
     });
 
     window.spawnWord = (wordData) => {
-        const sprite = createTextSprite(wordData.text);
-        sprite.position.set(wordData.x, 10, 0);
+        const color = wordData.is_special ? "#ffd700" : "rgba(0,255,0,1)";
+        const sprite = createTextSprite(wordData.text, color);
+        sprite.position.set(wordData.x, wordData.y || 10, 0);
         wordGroup.add(sprite);
         
         const duration = wordData.duration || 10.0;
-        // Distance 15 units (10 to -5)
-        const speed = 15.0 / (duration * 60.0);
+        // Standard falling speed if vy not provided
+        const stdSpeed = 15.0 / (duration * 60.0);
+        const vy = (wordData.vy !== undefined && wordData.vy !== null) ? wordData.vy : stdSpeed;
         
         activeWords.set(wordData.id, {
             sprite: sprite,
             text: wordData.text,
             id: wordData.id,
-            speed: speed
+            vx: wordData.vx || 0,
+            vy: vy,
+            is_special: wordData.is_special
         });
     };
 

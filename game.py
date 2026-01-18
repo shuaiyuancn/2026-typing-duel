@@ -109,7 +109,7 @@ class GameManager:
         await self.redis.hset(f"game:{code}", mapping=mapping)
         await self.redis.publish(f"game:{code}:events", json.dumps({"type": "status_change", "status": status}))
 
-    async def _spawn_word(self, code, pid, word_text, x=None, duration=10.0):
+    async def _spawn_word(self, code, pid, word_text, x=None, y=10.0, vx=0.0, vy=None, duration=10.0, is_special=False):
         if x is None:
             x = random.uniform(-4, 4)
         word_id = self._generate_id()
@@ -117,8 +117,12 @@ class GameManager:
             "text": word_text,
             "id": word_id,
             "x": x,
+            "y": y,
+            "vx": vx,
+            "vy": vy,
             "spawn_time": time.time(),
-            "duration": duration
+            "duration": duration,
+            "is_special": is_special
         }
         await self.redis.hset(f"game:{code}:{pid}:words", word_id, json.dumps(word_data))
         await self.redis.publish(f"game:{code}:events", json.dumps({
@@ -159,7 +163,14 @@ class GameManager:
                     # Speed Scaling: 10s -> 3s over 3 mins (180s)
                     duration = max(3.0, 10.0 - (elapsed / 18.0 * 7.0)) 
                     
-                    await self._spawn_word(code, pid, random.choice(words_pool), duration=duration)
+                    if random.random() < 0.1: # 10% Special
+                        is_left = random.choice([True, False])
+                        sx = -6 if is_left else 6
+                        svx = 0.05 if is_left else -0.05
+                        sy = random.uniform(2, 8)
+                        await self._spawn_word(code, pid, "BONUS", x=sx, y=sy, vx=svx, vy=0.0, duration=5.0, is_special=True)
+                    else:
+                        await self._spawn_word(code, pid, random.choice(words_pool), duration=duration)
                     
                     # 2. Check Expiration
                     active_words = await self.redis.hgetall(f"game:{code}:{pid}:words")
@@ -190,10 +201,8 @@ class GameManager:
                 players = json.loads(players_json)
                 
                 if pid in players:
-                    players[pid]["combo"] += 1
-                    multiplier = 1 + (players[pid]["combo"] // 5) * 0.5
-                    
-                    players[pid]["power"] += int(10 * multiplier) 
+                    bonus = 50 if w.get("is_special") else 0
+                    players[pid]["power"] += 10 + bonus # 25 for testing
                     players[pid]["words_cleared"] += 1
                     
                     triggered_power = None
